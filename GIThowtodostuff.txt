@@ -1,0 +1,14 @@
+Untracked files, pull, do:
+
+git add * 
+git stash
+git pull
+
+Untracked files, push, do:
+
+git add .
+git commit -a
+
+OR 
+
+git add -A
