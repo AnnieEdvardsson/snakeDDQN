@@ -1,14 +1,16 @@
 import pygame
 from random import randint
-from DQN import DQNAgent
+from DQN import DQNAgent, DDQNAgent, ExperienceReplay
 import numpy as np
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+from keras.utils.np_utils import to_categorical as one_hot
+from collections import namedtuple
 
 # Set options to activate or deactivate the game view, and its speed
-display_option = False
+display_option = True
 speed = 0
 pygame.font.init()
 
@@ -159,8 +161,8 @@ def initialize_game(player, game, food, agent):
     player.do_move(action, player.x, player.y, game, food, agent)
     state_init2 = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
-    agent.remember(state_init1, action, reward1, state_init2, game.crash)
-    agent.replay_new(agent.memory)
+    #agent.remember(state_init1, action, reward1, state_init2, game.crash)
+    #agent.replay_new(agent.memory)
 
 
 def plot_seaborn(array_counter, array_score):
@@ -168,19 +170,72 @@ def plot_seaborn(array_counter, array_score):
     ax = sns.regplot(np.array([array_counter])[0], np.array([array_score])[0], color="b", x_jitter=.1, line_kws={'color':'green'})
     ax.set(xlabel='games', ylabel='score')
     plt.show()
+def eps_greedy_policy(q_values, eps):
+    '''
+    Creates an epsilon-greedy policy
+    :param q_values: set of Q-values of shape (num actions,)
+    :param eps: probability of taking a uniform random action 
+    :return: policy of shape (num actions,)
+    '''
+    # YOUR CODE HERE
+    (num_actions,) = q_values.shape
+    rand = np.random.uniform()
+    if rand < eps:
+        probability = 1/num_actions
+        return np.ones(num_actions)*probability
+    
+    policy = np.zeros(num_actions)
+    action = q_values.argmax()
+    policy[action] = 1
+    
+    return policy
+
+def calculate_td_targets(q1_batch, q2_batch, r_batch, t_batch, gamma=.99):
+    '''
+    Calculates the TD-target used for the loss
+    : param q1_batch: Batch of Q(s', a) from online network, shape (N, num actions)
+    : param q2_batch: Batch of Q(s', a) from target network, shape (N, num actions)
+    : param r_batch: Batch of rewards, shape (N, 1)
+    : param t_batch: Batch of booleans indicating if state, s' is terminal, shape (N, 1)
+    : return: TD-target, shape (N, 1)
+    '''
+
+    # YOUR CODE HERE
+    N = len(q1_batch)
+    Y = r_batch.copy()
+    for i in range(N):
+        if not int(t_batch[i]):
+            a = np.argmax(q1_batch[i])
+            Y[i] += gamma*q2_batch[i,a]
+    
+    return Y
 
 def run():
+    Transition = namedtuple("Transition", ["s", "a", "r", "next_s", "t"])
     pygame.init()
-    agent = DQNAgent()
+    agent = DDQNAgent()
     counter_games = 0
     score_plot = []
     counter_plot =[]
     record = 0
-    while counter_games < 150:
+    R_buffer = []
+    R_avg = []
+    eps = 1.
+    eps_end = .1 
+    eps_decay = .001
+    steps = 0
+    batch_size = 128
+    gamma = 0.9
+    while counter_games < 1000:
         # Initialize classes
         game = Game(440, 440)
+        ep_reward = 0
         player1 = game.player
         food1 = game.food
+        q_buffer = []
+        state = agent.get_state(game, player1, food1)
+        steps += 1
+        i = steps - 1
 
         # Perform first move
         initialize_game(player1, game, food1, agent)
@@ -188,24 +243,36 @@ def run():
             display(player1, food1, game, record)
 
         while not game.crash:
-            agent.epsilon = 80 - counter_games
-            state_old = agent.get_state(game, player1, food1)
-            if randint(0, 200) < agent.epsilon:
-                final_move = to_categorical(randint(0, 2), num_classes=3)[0]
-            else:
-                prediction = agent.model.predict(state_old.reshape((1,11)))
-                final_move = to_categorical(np.argmax(prediction[0]), num_classes=3)[0]
+            q_values = agent.get_q_values(state.reshape((1,11)))
+            q_buffer.append(q_values)
+            policy = eps_greedy_policy(q_values[0], eps) 
+            action = np.random.choice(3, p=policy) # sample action from epsilon-greedy policy
+            final_move = to_categorical(action, num_classes=3)[0]
             player1.do_move(final_move, player1.x, player1.y, game, food1, agent)
-            state_new = agent.get_state(game, player1, food1)
+            new_state = agent.get_state(game, player1, food1)
             reward = agent.set_reward(player1, game.crash)
-            agent.train_short_memory(state_old, final_move, reward, state_new, game.crash)
-            agent.remember(state_old, final_move, reward, state_new, game.crash)
+            # only use the terminal flag for ending the episode and not for training
+            # if the flag is set due to that the maximum amount of steps is reached 
+            t_to_buffer = game.crash if not steps == 200 else False
+            
+            # store data to replay buffer
+            replay_buffer.add(Transition(s=state, a=action, r=reward, next_s=new_state, t=t_to_buffer))
+            state = new_state
             record = get_record(game.score, record)
+            # if buffer contains more than 1000 samples, perform one training step
+            if replay_buffer.buffer_length > 1000:
+                s, a, r, s_, t = replay_buffer.sample_minibatch(batch_size) # sample a minibatch of transitions
+                q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
+                td_target = calculate_td_targets(q_1, q_2, r, t, gamma)
+                agent.update(s, td_target, a)
+                
             if display_option:
                 display(player1, food1, game, record)
                 pygame.time.wait(speed)
-
-        agent.replay_new(agent.memory)
+        eps = max(eps - eps_decay, eps_end) # decrease epsilon        
+        R_buffer.append(reward)
+        
+        #agent.replay_new(agent.memory)
         counter_games += 1
         print('Game', counter_games, '      Score:', game.score)
         score_plot.append(game.score)
@@ -214,4 +281,7 @@ def run():
     plot_seaborn(counter_plot, score_plot)
 
 
+# Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored 
+# for training
+replay_buffer = ExperienceReplay(state_size=11)
 run()
