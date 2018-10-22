@@ -12,3 +12,12 @@ git commit -a
 OR 
 
 git add -A
+
+
+merge conflicts
+use
+git mergetool
+
+Reset everything and force pull remote
+git fetch --all
+git reset --hard origin/master
