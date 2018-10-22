@@ -21,3 +21,7 @@ git mergetool
 Reset everything and force pull remote
 git fetch --all
 git reset --hard origin/master
+
+Remove files
+git rm file1.txt
+git commit -m "remove file1.txt"
