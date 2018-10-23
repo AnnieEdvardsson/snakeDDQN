@@ -34,8 +34,10 @@ class ExperienceReplay:
 
     def sample_minibatch(self, batch_size=128):
         '''
+        From all previous steps (take "batch_size" many random indices and return the state, action, reward,
+        t, next_state
         :param batch_size:
-        :return:
+        :return: state_batch, action_batch, reward_batch, next_state_batch, t_batch
         '''
         ids = np.random.choice(a=self.buffer_length, size=batch_size)
         state_batch = np.zeros([batch_size, self._state_size])
@@ -52,112 +54,7 @@ class ExperienceReplay:
 
         return state_batch, action_batch, reward_batch, next_state_batch, t_batch
 
-class DQNAgent(object):
 
-    def __init__(self):
-        self.reward = 0
-        self.gamma = 0.9
-        self.dataframe = pd.DataFrame()
-        self.short_memory = np.array([])
-        self.agent_target = 1
-        self.agent_predict = 0
-        self.learning_rate = 0.0005
-        self.model = self.network()
-        #self.model = self.network("weights.hdf5")
-        self.epsilon = 0
-        self.actual = []
-        self.memory = []
-
-    def get_state(self, game, player, food):
-
-        state = [
-            (player.x_change == 20 and player.y_change == 0 and ((list(map(add, player.position[-1], [20, 0])) in player.position) or
-            player.position[-1][0] + 20 >= (game.game_width - 20))) or (player.x_change == -20 and player.y_change == 0 and ((list(map(add, player.position[-1], [-20, 0])) in player.position) or
-            player.position[-1][0] - 20 < 20)) or (player.x_change == 0 and player.y_change == -20 and ((list(map(add, player.position[-1], [0, -20])) in player.position) or
-            player.position[-1][-1] - 20 < 20)) or (player.x_change == 0 and player.y_change == 20 and ((list(map(add, player.position[-1], [0, 20])) in player.position) or
-            player.position[-1][-1] + 20 >= (game.game_height-20))),  # danger straight
-
-            (player.x_change == 0 and player.y_change == -20 and ((list(map(add,player.position[-1],[20, 0])) in player.position) or
-            player.position[ -1][0] + 20 > (game.game_width-20))) or (player.x_change == 0 and player.y_change == 20 and ((list(map(add,player.position[-1],
-            [-20,0])) in player.position) or player.position[-1][0] - 20 < 20)) or (player.x_change == -20 and player.y_change == 0 and ((list(map(
-            add,player.position[-1],[0,-20])) in player.position) or player.position[-1][-1] - 20 < 20)) or (player.x_change == 20 and player.y_change == 0 and (
-            (list(map(add,player.position[-1],[0,20])) in player.position) or player.position[-1][
-             -1] + 20 >= (game.game_height-20))),  # danger right
-
-             (player.x_change == 0 and player.y_change == 20 and ((list(map(add,player.position[-1],[20,0])) in player.position) or
-             player.position[-1][0] + 20 > (game.game_width-20))) or (player.x_change == 0 and player.y_change == -20 and ((list(map(
-             add, player.position[-1],[-20,0])) in player.position) or player.position[-1][0] - 20 < 20)) or (player.x_change == 20 and player.y_change == 0 and (
-            (list(map(add,player.position[-1],[0,-20])) in player.position) or player.position[-1][-1] - 20 < 20)) or (
-            player.x_change == -20 and player.y_change == 0 and ((list(map(add,player.position[-1],[0,20])) in player.position) or
-            player.position[-1][-1] + 20 >= (game.game_height-20))), #danger left
-
-
-            player.x_change == -20,  # move left
-            player.x_change == 20,  # move right
-            player.y_change == -20,  # move up
-            player.y_change == 20,  # move down
-            food.x_food < player.x,  # food left
-            food.x_food > player.x,  # food right
-            food.y_food < player.y,  # food up
-            food.y_food > player.y  # food down
-            ]
-
-        for i in range(len(state)):
-            if state[i]:
-                state[i]=1
-            else:
-                state[i]=0
-
-        return np.asarray(state)
-
-    def set_reward(self, player, crash):
-        self.reward = 0
-        if crash:
-            self.reward = -10
-            return self.reward
-        if player.eaten:
-            self.reward = 10
-        return self.reward
-
-    def network(self, weights=None):
-        model = Sequential()
-        model.add(Dense(output_dim=120, activation='relu', input_dim=11))
-        model.add(Dropout(0.15))
-        model.add(Dense(output_dim=120, activation='relu'))
-        model.add(Dropout(0.15))
-        model.add(Dense(output_dim=120, activation='relu'))
-        model.add(Dropout(0.15))
-        model.add(Dense(output_dim=3, activation='softmax'))
-        opt = Adam(self.learning_rate)
-        model.compile(loss='mse', optimizer=opt)
-
-        if weights:
-            model.load_weights(weights)
-        return model
-
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
-
-    def replay_new(self, memory):
-        if len(memory) > 1000:
-            minibatch = random.sample(memory, 1000)
-        else:
-            minibatch = memory
-        for state, action, reward, next_state, done in minibatch:
-            target = reward
-            if not done:
-                target = reward + self.gamma * np.amax(self.model.predict(np.array([next_state]))[0])
-            target_f = self.model.predict(np.array([state]))
-            target_f[0][np.argmax(action)] = target
-            self.model.fit(np.array([state]), target_f, epochs=1, verbose=0)
-
-    def train_short_memory(self, state, action, reward, next_state, done):
-        target = reward
-        if not done:
-            target = reward + self.gamma * np.amax(self.model.predict(next_state.reshape((1, 11)))[0])
-        target_f = self.model.predict(state.reshape((1, 11)))
-        target_f[0][np.argmax(action)] = target
-        self.model.fit(state.reshape((1, 11)), target_f, epochs=1, verbose=0)
 class DDQNAgent(object):
     
     def __init__(self):
@@ -179,9 +76,10 @@ class DDQNAgent(object):
         self._online_model = self.__build_model()
         self._offline_model = self.__build_model()
         # define ops for updating the networks
-        self._update = self.__mse() 
+        self._update = self.__mse()
 
-    def get_state(self, game, player, food):
+    @staticmethod
+    def get_state(game, player, food):
 
         state = [
             (player.x_change == 20 and player.y_change == 0 and ((list(map(add, player.position[-1], [20, 0])) in player.position) or
@@ -217,9 +115,9 @@ class DDQNAgent(object):
 
         for i in range(len(state)):
             if state[i]:
-                state[i]=1
+                state[i] = 1
             else:
-                state[i]=0
+                state[i] = 0
 
         return np.asarray(state)
 
@@ -266,7 +164,7 @@ class DDQNAgent(object):
 
     def get_q_values_for_both_models(self, states):
         '''
-        Calcuates Q-values for both models
+        Calculates Q-values for both models
         :param states: set of states
         :return: Q-values for online network, Q-values for offline network
         '''
@@ -282,7 +180,7 @@ class DDQNAgent(object):
 
     def update(self, states, td_target, actions):
         '''
-        Performes one update step on the model and switches between online and offline network
+        Performe one update step on the model and 50% chance to switch between online and offline network
         :param states: batch of states
         :param td_target: batch of temporal difference targets
         :param actions: batch of actions
@@ -301,3 +199,44 @@ class DDQNAgent(object):
         online_params = self._online_model.get_weights()
         self._online_model.set_weights(offline_params)
         self._offline_model.set_weights(online_params)
+
+
+def eps_greedy_policy(q_values, eps):
+    '''
+    Creates an epsilon-greedy policy
+    :param q_values: set of Q-values of shape (num actions,)
+    :param eps: probability of taking a uniform random action
+    :return: policy of shape (num actions,)
+    '''
+
+    (num_actions,) = q_values.shape
+    rand = np.random.uniform()
+    if rand < eps:
+        probability = 1 / num_actions
+        return np.ones(num_actions) * probability
+
+    policy = np.zeros(num_actions)
+    action = q_values.argmax()
+    policy[action] = 1
+
+    return policy
+
+
+def calculate_td_targets(q1_batch, q2_batch, r_batch, t_batch, gamma=.99):
+    '''
+    Calculates the TD-target used for the loss
+    : param q1_batch: Batch of Q(s', a) from online network, shape (N, num actions)
+    : param q2_batch: Batch of Q(s', a) from target network, shape (N, num actions)
+    : param r_batch: Batch of rewards, shape (N, 1)
+    : param t_batch: Batch of booleans indicating if state, s' is terminal, shape (N, 1)
+    : return: TD-target, shape (N, 1)
+    '''
+
+    N = len(q1_batch)
+    Y = r_batch.copy()
+    for i in range(N):
+        if not int(t_batch[i]):
+            a = np.argmax(q1_batch[i])
+            Y[i] += gamma * q2_batch[i, a]
+
+    return Y
