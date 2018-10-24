@@ -1,6 +1,6 @@
 import pygame
 from random import randint
-from DQN import DQNAgent, DDQNAgent, ExperienceReplay
+from DQN import DDQNAgent, ExperienceReplay
 import numpy as np
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
@@ -155,15 +155,16 @@ def update_screen():
     pygame.display.update()
 
 
-def initialize_game(player, game, food, agent):
+def initialize_game(player, game, food, agent, replay_buffer):
+    Transition = namedtuple("Transition", ["s", "a", "r", "next_s", "t"])
     state_init1 = agent.get_state(game, player, food)  # [0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0]
     action = [1, 0, 0]
     player.do_move(action, player.x, player.y, game, food, agent)
     state_init2 = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
+    replay_buffer.add(Transition(s=state_init1, a=np.argmax(action), r=reward1, next_s=state_init2, t=game.crash))
     #agent.remember(state_init1, action, reward1, state_init2, game.crash)
     #agent.replay_new(agent.memory)
-
 
 def plot_seaborn(array_counter, array_score):
     sns.set(color_codes=True)
@@ -214,19 +215,16 @@ def run():
     Transition = namedtuple("Transition", ["s", "a", "r", "next_s", "t"])
     pygame.init()
     agent = DDQNAgent()
-    counter_games = 0
     score_plot = []
-    counter_plot =[]
+    counter_plot = []
+    counter_games = 0
     record = 0
-    R_buffer = []
-    R_avg = []
-    eps = 1.
-    eps_end = .1 
-    eps_decay = .001
-    steps = 0
+    eps = .5
+    eps_end = .05 
+    eps_decay = .01
     batch_size = 128
     gamma = 0.9
-    while counter_games < 1000:
+    while counter_games < 3000:
         # Initialize classes
         game = Game(440, 440)
         ep_reward = 0
@@ -234,29 +232,32 @@ def run():
         food1 = game.food
         q_buffer = []
         state = agent.get_state(game, player1, food1)
-        steps += 1
-        i = steps - 1
+        #state.resize(12,)
+        
+        #state[11] = game.score
+        print(state.shape)
+        
+        
 
         # Perform first move
-        initialize_game(player1, game, food1, agent)
+        initialize_game(player1, game, food1, agent, replay_buffer)
         if display_option:
             display(player1, food1, game, record)
 
         while not game.crash:
-            q_values = agent.get_q_values(state.reshape((1,11)))
-            q_buffer.append(q_values)
+            q_values = agent.get_q_values(state.reshape((1,12)))
+            q_buffer.append(q_values[0])
             policy = eps_greedy_policy(q_values[0], eps) 
             action = np.random.choice(3, p=policy) # sample action from epsilon-greedy policy
             final_move = to_categorical(action, num_classes=3)[0]
             player1.do_move(final_move, player1.x, player1.y, game, food1, agent)
             new_state = agent.get_state(game, player1, food1)
+            #new_state.resize(12,)
+            #new_state[11] = game.score
             reward = agent.set_reward(player1, game.crash)
-            # only use the terminal flag for ending the episode and not for training
-            # if the flag is set due to that the maximum amount of steps is reached 
-            t_to_buffer = game.crash if not steps == 200 else False
-            
+                 
             # store data to replay buffer
-            replay_buffer.add(Transition(s=state, a=action, r=reward, next_s=new_state, t=t_to_buffer))
+            replay_buffer.add(Transition(s=state, a=action, r=reward, next_s=new_state, t=game.crash))
             state = new_state
             record = get_record(game.score, record)
             # if buffer contains more than 1000 samples, perform one training step
@@ -269,12 +270,22 @@ def run():
             if display_option:
                 display(player1, food1, game, record)
                 pygame.time.wait(speed)
+                
         eps = max(eps - eps_decay, eps_end) # decrease epsilon        
-        R_buffer.append(reward)
+        if replay_buffer.buffer_length > 1000:
+            s, a, r, s_, t = replay_buffer.sample_minibatch(1000) # sample a minibatch of transitions
+            q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
+            td_target = calculate_td_targets(q_1, q_2, r, t, gamma)
+            agent.update(s, td_target, a)
+        else:
+            s, a, r, s_, t = replay_buffer.sample_minibatch(replay_buffer.buffer_length) # sample a minibatch of transitions
+            q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
+            td_target = calculate_td_targets(q_1, q_2, r, t, gamma)
+            agent.update(s, td_target, a)
         
         #agent.replay_new(agent.memory)
         counter_games += 1
-        print('Game', counter_games, '      Score:', game.score)
+        print('Game', counter_games, '      Score:', game.score, '      Epsilon:', eps)
         score_plot.append(game.score)
         counter_plot.append(counter_games)
     agent.model.save_weights('weights.hdf5')
@@ -283,5 +294,5 @@ def run():
 
 # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored 
 # for training
-replay_buffer = ExperienceReplay(state_size=11)
+replay_buffer = ExperienceReplay(state_size=12)
 run()
