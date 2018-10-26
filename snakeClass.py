@@ -1,11 +1,6 @@
 import pygame
 from random import randint
-<<<<<<< HEAD
-from DQN import DDQNAgent, ExperienceReplay
-import numpy as np
-=======
 from DQN import DDQNAgent, ExperienceReplay, eps_greedy_policy, calculate_td_targets
->>>>>>> c83413b0ba532f13d16842a08551306c087c129f
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -229,7 +224,7 @@ def initialize_game(player, game, food, agent, replay_buffer):
     Transition = namedtuple("Transition", ["s", "a", "r", "next_s", "t"])
     state_init1 = agent.get_state(game, player, food)  # [0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0]
     action = [1, 0, 0]
-    player.do_move(action, player.x, player.y, game, food, agent)
+    player.do_move(action, player.x, player.y, game, food)
     state_init2 = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
     replay_buffer.add(Transition(s=state_init1, a=np.argmax(action), r=reward1, next_s=state_init2, t=game.crash))
@@ -252,7 +247,7 @@ def plot_seaborn(array_counter, array_score):
 def run():
     # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored
     # for training
-    replay_buffer = ExperienceReplay(state_size=11)
+    replay_buffer = ExperienceReplay(state_size=12)
 
     # Tuple subclass named Transition
     Transition = namedtuple("Transition", ["s", "a", "r", "next_s", "t"])
@@ -266,13 +261,13 @@ def run():
     record = 0                      # Highest score
 
     # Design parameters
-    eps = 1.                        # "start epsilon"
+    eps = .5                        # "start epsilon"
     eps_end = .01                   # "Final epsilon"
-    eps_decay = .001                # Parameter how slowly it decays
+    eps_decay = .004                # Parameter how slowly it decays
 
-    batch_size = 512                # The size of the batch
-    gamma = 0.9                     # How much the future rewards matter
-    number_episodes = 1000          # Number of episodes (games) we train on
+    batch_size = 256                # The size of the batch
+    gamma = 0.95                     # How much the future rewards matter
+    number_episodes = 2000          # Number of episodes (games) we train on
 
     # Run "number_episodes" games
     while counter_games < number_episodes:
@@ -287,7 +282,7 @@ def run():
         q_buffer = []               # A vector with all q_values
 
         # Perform first move
-        initialize_game(player1, game, food1)
+        initialize_game(player1, game, food1, agent, replay_buffer)
 
         # Display window if display_option is True
         if display_option:
@@ -304,7 +299,7 @@ def run():
 
             # Choose an action w.r.t. the policy and converts it to one-hot format (eg 2 to [0, 0, 1])
             action = np.random.choice(3, p=policy)
-            action_hot = to_categorical(action, num_classes=3) # [0] # CHANGE HERE
+            action_hot = to_categorical(action, num_classes=3)[0] # [0] # CHANGE HERE
 
             # Let the player do the chosen action
             player1.do_move(action_hot, player1.x, player1.y, game, food1)
@@ -371,7 +366,6 @@ def run():
     # Plot the score to the number of game
     plot_seaborn(counter_plot, score_plot)
 
-# Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored 
+
 # for training
-replay_buffer = ExperienceReplay(state_size=12)
 run()
