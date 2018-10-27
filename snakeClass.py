@@ -1,6 +1,6 @@
 import pygame
 from random import randint
-from DQN import DDQNAgent, ExperienceReplay, eps_greedy_policy, calculate_td_targets
+from DQN import AGENT, DQNAgent, DDQNAgent, ExperienceReplay
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -228,8 +228,7 @@ def initialize_game(player, game, food, agent, replay_buffer):
     state_init2 = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
     replay_buffer.add(Transition(s=state_init1, a=np.argmax(action), r=reward1, next_s=state_init2, t=game.crash))
-    #agent.remember(state_init1, action, reward1, state_init2, game.crash)
-    #agent.replay_new(agent.memory)
+
 
 def plot_seaborn(array_counter, array_score):
     """
@@ -244,7 +243,7 @@ def plot_seaborn(array_counter, array_score):
     plt.show()
 
 
-def run():
+def run(agent):
     # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored
     # for training
     replay_buffer = ExperienceReplay(state_size=12)
@@ -252,7 +251,6 @@ def run():
     # Tuple subclass named Transition
     Transition = namedtuple("Transition", ["s", "a", "r", "next_s", "t"])
     pygame.init()                   # Initialize all imported pygame modules
-    agent = DDQNAgent()             # Initialize DDQN class
 
     # Initialize to zero
     counter_games = 0               # The number of games played
@@ -263,10 +261,10 @@ def run():
     # Design parameters
     eps = .5                        # "start epsilon"
     eps_end = .01                   # "Final epsilon"
-    eps_decay = .004                # Parameter how slowly it decays
+    eps_decay = .0005               # Parameter how slowly it decays
 
-    batch_size = 256                # The size of the batch
-    gamma = 0.95                     # How much the future rewards matter
+    batch_size = 128                # The size of the batch
+    gamma = 0.99                    # How much the future rewards matter
     number_episodes = 2000          # Number of episodes (games) we train on
 
     # Run "number_episodes" games
@@ -295,11 +293,11 @@ def run():
             q_buffer.append(q_values)
 
             # Evaluate new policy w.r.t q-values and epsilon (epsilon-greedy policy)
-            policy = eps_greedy_policy(q_values[0], eps)
+            policy = agent.eps_greedy_policy(q_values[0], eps)
 
             # Choose an action w.r.t. the policy and converts it to one-hot format (eg 2 to [0, 0, 1])
             action = np.random.choice(3, p=policy)
-            action_hot = to_categorical(action, num_classes=3)[0] # [0] # CHANGE HERE
+            action_hot = to_categorical(action, num_classes=3) # [0] # CHANGE HERE
 
             # Let the player do the chosen action
             player1.do_move(action_hot, player1.x, player1.y, game, food1)
@@ -323,15 +321,28 @@ def run():
             # If we have done more than 1000 steps in total (over multiple games)
             # then !perform one training step!
             if replay_buffer.buffer_length > 1000:
-                # Get batch_size many random samples of state, action, reward, t, next_state from pervious
+                # Get batch_size many random samples of state, action, reward, t, next_state from previous
                 # experience
                 s, a, r, s_, t = replay_buffer.sample_minibatch(batch_size)
 
-                # Get q_values for both online and offline network
-                q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
+                if agent.DDQN is True:
 
-                # Calculate the td-targets
-                td_target = calculate_td_targets(q_1, q_2, r, t, gamma)
+                    # Get q_values for both online and offline network
+                    q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
+
+                    # Calculate the td-targets
+                    td_target = agent.calculate_td_targets(q_1, q_2, r, t, gamma)
+
+                else:
+
+                    # Get q_values for network
+                    q_values = agent.get_q_values(np.squeeze(s_))
+
+                    # Update q-target if agent.targetIt is greater than 10
+                    agent.target_update(q_values)
+
+                    # Calculate the td-targets
+                    td_target = agent.calculate_td_targets(agent.Q_target, r, t, gamma)
 
                 # Perform one update step on the model and 50% chance to switch between online and offline network
                 # Almost the same thing as model.fit in Keras
@@ -342,30 +353,46 @@ def run():
                 display(player1, food1, game, record)
                 pygame.time.wait(speed)
                 
-        eps = max(eps - eps_decay, eps_end) # decrease epsilon        
-        if replay_buffer.buffer_length > 1000:
-            s, a, r, s_, t = replay_buffer.sample_minibatch(1000) # sample a minibatch of transitions
-            q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
-            td_target = calculate_td_targets(q_1, q_2, r, t, gamma)
-            agent.update(s, td_target, a)
-        else:
+        eps = max(eps - eps_decay, eps_end)  # decrease epsilon
+        if replay_buffer.buffer_length < 1000:
             s, a, r, s_, t = replay_buffer.sample_minibatch(replay_buffer.buffer_length) # sample a minibatch of transitions
-            q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
-            td_target = calculate_td_targets(q_1, q_2, r, t, gamma)
+            if agent.DDQN is True:
+                # Get q_values for both online and offline network
+                q_1, q_2 = agent.get_q_values_for_both_models(np.squeeze(s_))
+                # Calculate the td-targets
+                td_target = agent.calculate_td_targets(q_1, q_2, r, t, gamma)
+
+            else:
+                # Get q_values for network
+                q_values = agent.get_q_values(np.squeeze(s_))
+                # Update q-target if agent.targetIt is greater than 10
+                agent.target_update(q_values)
+                # Calculate the td-targets
+                td_target = agent.calculate_td_targets(agent.Q_target, r, t, gamma)
             agent.update(s, td_target, a)
         
-        #agent.replay_new(agent.memory)
+        # agent.replay_new(agent.memory)
         counter_games += 1
-        print('Game', counter_games, '      Score:', game.score, '      Epsilon:', eps)
+        print('Game %i      Score: %i      Epsilon: %.4f' % (counter_games,game.score ,round(eps, 5)))
         score_plot.append(game.score)
         counter_plot.append(counter_games)
 
     # Save the weighs of the model to the computer
-    agent.model.save_weights('weights.hdf5')
+    agent.model.save_weights('weights_DQN.hdf5')
 
     # Plot the score to the number of game
     plot_seaborn(counter_plot, score_plot)
 
+    return agent
+
+
+# Initialize DQN class
+pre_agent = DQNAgent()
+
+# Initialize DDQN class
+# pre_agent = DDQNAgent()
 
 # for training
-run()
+aft_agent = run(pre_agent)
+
+
