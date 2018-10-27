@@ -339,10 +339,12 @@ def run(agent):
                     q_values = agent.get_q_values(np.squeeze(s_))
 
                     # Update q-target if agent.targetIt is greater than 10
-                    agent.target_update(q_values)
+                    # agent.target_update(q_values)
 
+                    # print(q_values.size)
+                    # print(agent.Q_target.size)
                     # Calculate the td-targets
-                    td_target = agent.calculate_td_targets(agent.Q_target, r, t, gamma)
+                    td_target = agent.calculate_td_targets(q_values, r, t, gamma) #agent.Q_target
 
                 # Perform one update step on the model and 50% chance to switch between online and offline network
                 # Almost the same thing as model.fit in Keras
