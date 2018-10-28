@@ -7,8 +7,7 @@ from keras.layers import Dense, Input
 from keras.optimizers import RMSprop
 from keras import backend as K
 from keras.initializers import RandomUniform
-from keras.models import Model, load_model
-from keras import optimizers
+from keras.models import Model
 
 
 class ExperienceReplay:
@@ -64,7 +63,7 @@ class AGENT(object):
         self.action_dim = 3
 
         # define one deep Q-networks
-        self._online_model = self.build_model()
+        self.online_model = self.build_model()
 
         # define ops for updating the networks
         self._update = self.__mse()
@@ -162,7 +161,7 @@ class AGENT(object):
         :param states: set of states
         :return: Q-values for online network, Q-values for offline network
         '''
-        return self._online_model.predict(states), self._offline_model.predict(states)
+        return self.online_model.predict(states), self.offline_model.predict(states)
 
     def update(self, states, td_target, actions):
         '''
@@ -181,10 +180,10 @@ class AGENT(object):
         '''
         Switches between online and offline networks
         '''
-        offline_params = self._offline_model.get_weights()
-        online_params = self._online_model.get_weights()
-        self._online_model.set_weights(offline_params)
-        self._offline_model.set_weights(online_params)
+        offline_params = self.offline_model.get_weights()
+        online_params = self.online_model.get_weights()
+        self.online_model.set_weights(offline_params)
+        self.offline_model.set_weights(online_params)
 
     @staticmethod
     def eps_greedy_policy(q_values, eps):
@@ -212,7 +211,7 @@ class AGENT(object):
         Mean squared error loss
         :return: Keras function
         '''
-        q_values = self._online_model.output
+        q_values = self.online_model.output
         # trace of taken actions
         target = K.placeholder(shape=(None,), name='target_value')
         a_1_hot = K.placeholder(shape=(None, self.action_dim), name='chosen_actions')
@@ -221,9 +220,9 @@ class AGENT(object):
         squared_error = K.square(target - q_value)
         mse = K.mean(squared_error)
         optimizer = RMSprop(lr=self._lr)
-        updates = optimizer.get_updates(loss=mse, params=self._online_model.trainable_weights)
+        updates = optimizer.get_updates(loss=mse, params=self.online_model.trainable_weights)
 
-        return K.function(inputs=[self._online_model.input, target, a_1_hot], outputs=[], updates=updates)
+        return K.function(inputs=[self.online_model.input, target, a_1_hot], outputs=[], updates=updates)
 
 
 class DDQNAgent(AGENT):
@@ -234,7 +233,7 @@ class DDQNAgent(AGENT):
     def __init__(self):
         AGENT.__init__(self)    # Run the init function in the Base class AGENT
         # Define second offline network
-        self._offline_model = self.build_model()
+        self.offline_model = self.build_model()
         self.DDQN = True
 
     def get_q_values_for_both_models(self, states):
@@ -243,7 +242,7 @@ class DDQNAgent(AGENT):
         :param states: set of states
         :return: Q-values for online network, Q-values for offline network
         '''
-        return self._online_model.predict(states), self._offline_model.predict(states)
+        return self.online_model.predict(states), self.offline_model.predict(states)
 
     def get_q_values(self, state):
         '''
@@ -251,7 +250,7 @@ class DDQNAgent(AGENT):
         :param state:
         :return:
         '''
-        return self._online_model.predict(state)
+        return self.online_model.predict(state)
 
     def update(self, states, td_target, actions):
         '''
@@ -270,10 +269,10 @@ class DDQNAgent(AGENT):
         '''
         Switches between online and offline networks
         '''
-        offline_params = self._offline_model.get_weights()
-        online_params = self._online_model.get_weights()
-        self._online_model.set_weights(offline_params)
-        self._offline_model.set_weights(online_params)
+        offline_params = self.offline_model.get_weights()
+        online_params = self.online_model.get_weights()
+        self.online_model.set_weights(offline_params)
+        self.offline_model.set_weights(online_params)
 
     @staticmethod
     def calculate_td_targets(q1_batch, q2_batch, r_batch, t_batch, gamma=.99):
@@ -303,7 +302,7 @@ class DQNAgent(AGENT):
     def __init__(self):
         AGENT.__init__(self)  # Run the init function in the Base class AGENT
         self.DDQN = False
-        self._target_model = self.build_model()
+        self.target_model = self.build_model()
 
     def update(self, states, td_target, actions):
         '''
@@ -322,7 +321,7 @@ class DQNAgent(AGENT):
         :param state:
         :return:
         '''
-        return self._target_model.predict(state)
+        return self.target_model.predict(state)
 
     @staticmethod
     def calculate_td_targets(Q,  r_batch, t_batch, gamma=.99):
@@ -353,8 +352,8 @@ class DQNAgent(AGENT):
         if self.targetIt > tau_lim:
             self.targetIt = 0
 
-            self._online_model.save_weights("model_online_weights.h5")
-            self._target_model.load_weights("model_online_weights.h5")
+            self.online_model.save_weights("model_online_weights.h5")
+            self.target_model.load_weights("model_online_weights.h5")
 
 
 

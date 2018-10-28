@@ -7,6 +7,7 @@ import seaborn as sns
 import numpy as np
 from collections import namedtuple
 
+
 # Set options to activate or deactivate the game view, and its speed
 display_option = True
 speed = 0                       # The speed we run the game, zero is fastest
@@ -243,6 +244,107 @@ def plot_seaborn(array_counter, array_score):
     plt.show()
 
 
+def evaluate_network(agent, name):
+    # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored
+    # for training
+    replay_buffer = ExperienceReplay(state_size=12)
+
+    # Tuple subclass named Transition
+    Transition = namedtuple("Transition", ["s", "a", "r", "next_s", "t"])
+    pygame.init()  # Initialize all imported pygame modules
+
+    # Initialize to zero
+    counter_games = 0  # The number of games played
+    score_plot = []  # The scores over time, used to plot
+    counter_plot = []  # The game number over time [1 2 3 ... N], used to plot
+    record = 0  # Highest score
+    average_score = 0
+
+    eps = 0
+    number_episodes = 15  # Number of episodes (games) we train on
+
+    # Load the weighs of the model from the computer
+    if agent.DDQN is True:
+        agent.offline_model.load_weights(name)
+    else:
+        agent.target_model.load_weights(name)
+
+    # Run "number_episodes" games
+    while counter_games < number_episodes:
+
+        steps = 0
+
+        # Initialize classes
+        game = Game(440, 440)  # eg set game.crash to False
+        player1 = game.player
+        food1 = game.food
+        state = agent.get_state(game, player1, food1)
+
+        # Reset variables
+        q_buffer = []  # A vector with all q_values
+
+        # Perform first move
+        initialize_game(player1, game, food1, agent, replay_buffer)
+
+        # Display window if display_option is True
+        if display_option:
+            display(player1, food1, game, record)
+
+        # While the snake as not died
+        while not (game.crash or steps > 934):
+            steps += 1
+            # Get the q-values w.r.t. the states
+            q_values = agent.get_q_values(state.reshape((1, 12)))
+            q_buffer.append(q_values)
+
+            # Evaluate new policy w.r.t q-values and epsilon (epsilon-greedy policy)
+            policy = agent.eps_greedy_policy(q_values[0], eps)
+
+            # Choose an action w.r.t. the policy and converts it to one-hot format (eg 2 to [0, 0, 1])
+            action = np.random.choice(3, p=policy)
+            action_hot = to_categorical(action, num_classes=3)  # [0] # CHANGE HERE
+
+            # Let the player do the chosen action
+            player1.do_move(action_hot, player1.x, player1.y, game, food1)
+
+            # Update the state variables
+            new_state = agent.get_state(game, player1, food1)
+
+            # Give reward, 0 - alive, 10 - eaten, -10 - died
+            reward = agent.set_reward(player1, game.crash)
+
+            # Store data to the Tuple subclass Transition and then use the function add in replay_buffer to add
+            # Transition to replay_buffer.__buffer
+            replay_buffer.add(Transition(s=state, a=action, r=reward, next_s=new_state, t=game.crash))
+
+            # Assign the "old" state as the new
+            state = new_state
+
+            # Update record (high score)
+            record = get_record(game.score, record)
+
+            # Update display if display_option == True
+            if display_option:
+                display(player1, food1, game, record)
+                pygame.time.wait(speed)
+
+        counter_games += 1
+        print('Game %i      Score: %i      Epsilon: %.4f' % (counter_games, game.score, round(eps, 5)))
+        score_plot.append(game.score)
+        counter_plot.append(counter_games)
+
+        average_score += game.score
+
+    # Plot the score to the number of game
+    plot_seaborn(counter_plot, score_plot)
+    plt.savefig('eval_plot', dpi=400)
+
+    average_score = round(average_score/number_episodes)
+    print('The highest score: %i, the average score: %i' % (record, average_score))
+
+    return agent
+
+
 def run(agent):
     # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored
     # for training
@@ -389,21 +491,25 @@ def run(agent):
         counter_plot.append(counter_games)
 
     # Save the weighs of the model to the computer
-    agent.model.save_weights('weights_DQN.hdf5')
+    agent.online_model.save_weights('weights_DQN.hdf5')
 
     # Plot the score to the number of game
     plot_seaborn(counter_plot, score_plot)
+    plt.savefig('train_plot', dpi=400)
 
     return agent
 
 
 # Initialize DQN class
-pre_agent = DQNAgent()
+aft_agent = DQNAgent()
 
 # Initialize DDQN class
 # pre_agent = DDQNAgent()
 
 # for training
-aft_agent = run(pre_agent)
+#aft_agent = run(pre_agent)
+
+name_of_weights = 'model_online_weights.h5'
+evaluate_network(aft_agent, name_of_weights)
 
 
