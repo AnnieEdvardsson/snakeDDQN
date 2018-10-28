@@ -265,7 +265,7 @@ def run(agent):
 
     batch_size = 128                # The size of the batch
     gamma = 0.99                    # How much the future rewards matter
-    number_episodes = 10000         # Number of episodes (games) we train on
+    number_episodes = 2000          # Number of episodes (games) we train on
 
     tau_lim = 5                     # Number of iteration between target updates
 
