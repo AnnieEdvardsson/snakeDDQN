@@ -7,7 +7,8 @@ from keras.layers import Dense, Input
 from keras.optimizers import RMSprop
 from keras import backend as K
 from keras.initializers import RandomUniform
-from keras.models import Model
+from keras.models import Model, load_model
+from keras import optimizers
 
 
 class ExperienceReplay:
@@ -155,24 +156,6 @@ class AGENT(object):
 
         return model
 
-    def __mse(self):
-        '''
-        Mean squared error loss
-        :return: Keras function
-        '''
-        q_values = self._online_model.output
-        # trace of taken actions
-        target = K.placeholder(shape=(None,), name='target_value')
-        a_1_hot = K.placeholder(shape=(None, self.action_dim), name='chosen_actions')
-
-        q_value = K.sum(q_values * a_1_hot, axis=1)
-        squared_error = K.square(target - q_value)
-        mse = K.mean(squared_error)
-        optimizer = RMSprop(lr=self._lr)
-        updates = optimizer.get_updates(loss=mse, params=self._online_model.trainable_weights)
-
-        return K.function(inputs=[self._online_model.input, target, a_1_hot], outputs=[], updates=updates)
-
     def get_q_values_for_both_models(self, states):
         '''
         Calculates Q-values for both models
@@ -180,14 +163,6 @@ class AGENT(object):
         :return: Q-values for online network, Q-values for offline network
         '''
         return self._online_model.predict(states), self._offline_model.predict(states)
-
-    def get_q_values(self, state):
-        '''
-        Predict all Q-values for the current state
-        :param state:
-        :return:
-        '''
-        return self._online_model.predict(state)
 
     def update(self, states, td_target, actions):
         '''
@@ -232,6 +207,24 @@ class AGENT(object):
 
         return policy
 
+    def __mse(self):
+        '''
+        Mean squared error loss
+        :return: Keras function
+        '''
+        q_values = self._online_model.output
+        # trace of taken actions
+        target = K.placeholder(shape=(None,), name='target_value')
+        a_1_hot = K.placeholder(shape=(None, self.action_dim), name='chosen_actions')
+
+        q_value = K.sum(q_values * a_1_hot, axis=1)
+        squared_error = K.square(target - q_value)
+        mse = K.mean(squared_error)
+        optimizer = RMSprop(lr=self._lr)
+        updates = optimizer.get_updates(loss=mse, params=self._online_model.trainable_weights)
+
+        return K.function(inputs=[self._online_model.input, target, a_1_hot], outputs=[], updates=updates)
+
 
 class DDQNAgent(AGENT):
     """
@@ -251,6 +244,14 @@ class DDQNAgent(AGENT):
         :return: Q-values for online network, Q-values for offline network
         '''
         return self._online_model.predict(states), self._offline_model.predict(states)
+
+    def get_q_values(self, state):
+        '''
+        Predict all Q-values for the current state
+        :param state:
+        :return:
+        '''
+        return self._online_model.predict(state)
 
     def update(self, states, td_target, actions):
         '''
@@ -277,12 +278,12 @@ class DDQNAgent(AGENT):
     @staticmethod
     def calculate_td_targets(q1_batch, q2_batch, r_batch, t_batch, gamma=.99):
         '''
-        Calculates the TD-target used for the loss
-        : param q1_batch: Batch of Q(s', a) from the online network, shape (N, num actions)
-        : param q2_batch: Batch of Q(s', a) from the offline network, shape (N, num actions)
-        : param r_batch: Batch of rewards, shape (N, 1)
-        : param t_batch: Batch of booleans indicating if state, s' is terminal, shape (N, 1)
-        : return: TD-target, shape (N, 1)
+            Calculates the TD-target used for the loss
+            : param q1_batch: Batch of Q(s', a) from the online network, shape (N, num actions)
+            : param q2_batch: Batch of Q(s', a) from the offline network, shape (N, num actions)
+            : param r_batch: Batch of rewards, shape (N, 1)
+            : param t_batch: Batch of booleans indicating if state, s' is terminal, shape (N, 1)
+            : return: TD-target, shape (N, 1)
         '''
 
         N = len(q1_batch)
@@ -302,10 +303,11 @@ class DQNAgent(AGENT):
     def __init__(self):
         AGENT.__init__(self)  # Run the init function in the Base class AGENT
         self.DDQN = False
+        self._target_model = self.build_model()
 
     def update(self, states, td_target, actions):
         '''
-        Performe one update step on the model
+        Perforce one update step on the model
         :param states: batch of states
         :param td_target: batch of temporal difference targets
         :param actions: batch of actions
@@ -313,6 +315,14 @@ class DQNAgent(AGENT):
         '''
         actions_one_hot = to_categorical(np.squeeze(actions), self.action_dim)
         self._update([states, np.squeeze(td_target), actions_one_hot])
+
+    def get_q_values(self, state):
+        '''
+        Predict all Q-values for the current state
+        :param state:
+        :return:
+        '''
+        return self._target_model.predict(state)
 
     @staticmethod
     def calculate_td_targets(Q,  r_batch, t_batch, gamma=.99):
@@ -332,7 +342,7 @@ class DQNAgent(AGENT):
                 Y[i] += gamma * q_max
         return Y
 
-    def target_update(self, Q):
+    def target_update(self, tau_lim):
         """
         Updates the Q-target w.r.t Q
         :param Q: The updated Q value
@@ -340,9 +350,11 @@ class DQNAgent(AGENT):
 
         self.targetIt += 1
 
-        if self.targetIt > 5:
+        if self.targetIt > tau_lim:
             self.targetIt = 0
-            self.Q_target = Q
+
+            self._online_model.save_weights("model_online_weights.h5")
+            self._target_model.load_weights("model_online_weights.h5")
 
 
 

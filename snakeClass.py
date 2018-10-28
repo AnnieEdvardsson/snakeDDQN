@@ -265,7 +265,9 @@ def run(agent):
 
     batch_size = 128                # The size of the batch
     gamma = 0.99                    # How much the future rewards matter
-    number_episodes = 2000          # Number of episodes (games) we train on
+    number_episodes = 10000         # Number of episodes (games) we train on
+
+    tau_lim = 5                     # Number of iteration between target updates
 
     # Run "number_episodes" games
     while counter_games < number_episodes:
@@ -333,22 +335,26 @@ def run(agent):
                     # Calculate the td-targets
                     td_target = agent.calculate_td_targets(q_1, q_2, r, t, gamma)
 
+                    # Perform one update step on the model and 50% chance to switch between online and offline network
+                    # Almost the same thing as model.fit in Keras
+                    agent.update(s, td_target, a)
+
                 else:
 
                     # Get q_values for network
                     q_values = agent.get_q_values(np.squeeze(s_))
 
-                    # Update q-target if agent.targetIt is greater than 10
-                    # agent.target_update(q_values)
-
-                    # print(q_values.size)
-                    # print(agent.Q_target.size)
+                    #print(q_values.shape)
+                    #print(agent.Q_target.shape)
                     # Calculate the td-targets
                     td_target = agent.calculate_td_targets(q_values, r, t, gamma) #agent.Q_target
 
-                # Perform one update step on the model and 50% chance to switch between online and offline network
-                # Almost the same thing as model.fit in Keras
-                agent.update(s, td_target, a)
+                    # Perform one update step on the model and 50% chance to switch between online and offline network
+                    # Almost the same thing as model.fit in Keras
+                    agent.update(s, td_target, a)
+
+                    # Update q-target if agent.targetIt is greater than 10
+                    agent.target_update(tau_lim)
 
             # Update display if display_option == True
             if display_option:
@@ -367,10 +373,13 @@ def run(agent):
             else:
                 # Get q_values for network
                 q_values = agent.get_q_values(np.squeeze(s_))
-                # Update q-target if agent.targetIt is greater than 10
-                agent.target_update(q_values)
+
                 # Calculate the td-targets
-                td_target = agent.calculate_td_targets(agent.Q_target, r, t, gamma)
+                td_target = agent.calculate_td_targets(q_values, r, t, gamma)
+
+                # Update q-target if agent.targetIt is greater than 10
+                agent.target_update(tau_lim)
+
             agent.update(s, td_target, a)
         
         # agent.replay_new(agent.memory)
