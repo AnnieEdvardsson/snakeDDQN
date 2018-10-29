@@ -361,12 +361,12 @@ def run(agent, name_weights):
     record = 0                      # Highest score
 
     # Design parameters
-    eps = .5                        # "start epsilon"
+    eps = .8                        # "start epsilon"
     eps_end = .01                   # "Final epsilon"
     eps_decay = .0005               # Parameter how slowly it decays
 
-    batch_size = 128                # The size of the batch
-    gamma = 0.99                    # How much the future rewards matter
+    batch_size = 256                # The size of the batch
+    gamma = 0.95                    # How much the future rewards matter
     number_episodes = 2000          # Number of episodes (games) we train on
 
     tau_lim = 5                     # Number of iteration between target updates
@@ -439,7 +439,11 @@ def run(agent, name_weights):
 
                     # Perform one update step on the model and 50% chance to switch between online and offline network
                     # Almost the same thing as model.fit in Keras
-                    agent.update(s, td_target, a)
+                    if tau > tau_lim:
+                        agent.update_tau(s, td_target, a)
+                    else:
+                        agent.update(s, td_target, a)
+                     
 
                 else:
 
@@ -499,7 +503,7 @@ def run(agent, name_weights):
 
     return agent
 
-DDQN = False
+DDQN = True
 
 if DDQN is True:
 
