@@ -244,7 +244,7 @@ def plot_seaborn(array_counter, array_score):
     plt.show()
 
 
-def evaluate_network(agent, name):
+def evaluate_network(agent, name_weights):
     # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored
     # for training
     replay_buffer = ExperienceReplay(state_size=12)
@@ -265,9 +265,9 @@ def evaluate_network(agent, name):
 
     # Load the weighs of the model from the computer
     if agent.DDQN is True:
-        agent.offline_model.load_weights(name)
+        agent.offline_model.load_weights(name_weights)
     else:
-        agent.target_model.load_weights(name)
+        agent.target_model.load_weights(name_weights)
 
     # Run "number_episodes" games
     while counter_games < number_episodes:
@@ -345,7 +345,7 @@ def evaluate_network(agent, name):
     return agent
 
 
-def run(agent):
+def run(agent, name_weights):
     # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored
     # for training
     replay_buffer = ExperienceReplay(state_size=12)
@@ -491,7 +491,7 @@ def run(agent):
         counter_plot.append(counter_games)
 
     # Save the weighs of the model to the computer
-    agent.online_model.save_weights('weights_DQN.hdf5')
+    agent.online_model.save_weights(name_weights)
 
     # Plot the score to the number of game
     plot_seaborn(counter_plot, score_plot)
@@ -499,17 +499,26 @@ def run(agent):
 
     return agent
 
+DDQN = False
 
-# Initialize DQN class
-aft_agent = DQNAgent()
+if DDQN is True:
 
-# Initialize DDQN class
-# pre_agent = DDQNAgent()
+    # Name of weights + Initialize DDQN class + run training + evaluate
+    name_of_weights_DDQN = 'weights_DDQN.h5'
+    pre_agent = DDQNAgent()
+    aft_agent = run(pre_agent, name_of_weights_DDQN)
+    evaluate_network(aft_agent, name_of_weights_DDQN)
+else:
 
-# for training
-#aft_agent = run(pre_agent)
+    # Name of weights + Initialize DQN target class + run training + evaluate
+    name_of_weights_DQN = 'weights_DQN.h5'
+    pre_agent = DQNAgent()
+    aft_agent = run(pre_agent, name_of_weights_DQN)
+    evaluate_network(aft_agent, name_of_weights_DQN)
 
-name_of_weights = 'model_online_weights.h5'
-evaluate_network(aft_agent, name_of_weights)
+
+
+
+
 
 
