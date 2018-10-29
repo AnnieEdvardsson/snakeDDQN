@@ -243,8 +243,11 @@ def plot_seaborn(array_counter, array_score, plot_name):
     sns.set(color_codes=True)
     ax = sns.regplot(np.array([array_counter])[0], np.array([array_score])[0], color="b", x_jitter=.1, line_kws={'color':'green'})
     ax.set(xlabel='games', ylabel='score')
+    #plt.savefig(plot_name, dpi=400)
+
+    fig = ax.get_figure()
+    fig.savefig(plot_name, dpi=400)
     plt.show()
-    plt.savefig(plot_name, dpi=400)
 
 
 def evaluate_network(agent, name_weights):
@@ -264,9 +267,10 @@ def evaluate_network(agent, name_weights):
     average_score = 0
 
     eps = 0
-    number_episodes = 15  # Number of episodes (games) we train on
+    number_episodes = 100  # Number of episodes (games) we train on
 
     # Load the weighs of the model from the computer
+    agent.online_model.load_weights(name_weights)
     if agent.DDQN is True:
         agent.offline_model.load_weights(name_weights)
     else:
@@ -328,7 +332,7 @@ def evaluate_network(agent, name_weights):
                 pygame.time.wait(speed)
 
         counter_games += 1
-        print('Game %i      Score: %i      Epsilon: %.4f' % (counter_games, game.score, round(eps, 5)))
+        print('Game %i      Score: %i      Epsilon: %.4f    Highest: %i' % (counter_games, game.score, round(eps, 5), record))
         score_plot.append(game.score)
         counter_plot.append(counter_games)
 
@@ -340,7 +344,7 @@ def evaluate_network(agent, name_weights):
     return agent
 
 
-def run(agent, name_weights):
+def run(agent, name_weights, name_plot):
     # Create replay buffer, where experience in form of tuples <s,a,r,s',t>, gathered from the environment is stored
     # for training
     replay_buffer = ExperienceReplay(state_size=12)
@@ -360,8 +364,8 @@ def run(agent, name_weights):
     eps_end = .01                   # "Final epsilon"
     eps_decay = .0005               # Parameter how slowly it decays
 
-    batch_size = 256                # The size of the batch
-    gamma = 0.95                    # How much the future rewards matter
+    batch_size = 128                # The size of the batch
+    gamma = 0.99                    # How much the future rewards matter
     number_episodes = 2000          # Number of episodes (games) we train on
 
     tau_lim = 5                     # Number of iteration between target updates
@@ -486,12 +490,12 @@ def run(agent, name_weights):
     agent.online_model.save_weights(name_weights)
 
     # Plot the score to the number of game
-    plot_seaborn(counter_plot, score_plot, name_of_plot)
+    plot_seaborn(counter_plot, score_plot, name_plot)
 
     return agent
 
 # ################ CHANGE THESE!!!!! ##############
-DDQN = True
+DDQN = False
 target = False
 # #################################################
 
@@ -511,15 +515,15 @@ else:
         name_of_weights_DQN = 'weights_DQN_target.h5'
         name_of_plot = 'train_plot_DQN_target'
     else:
-        name_of_weights_DQN = 'weights_DQN_not_target.h5'
-        name_of_plot = 'train_plot_DQN_not_target'
+        name_of_weights_DQN = 'weights_DQN_not_target_2.h5'
+        name_of_plot = 'train_plot_DQN_not_target_2'
 
     pre_agent = DQNAgent(target)
     aft_agent = run(pre_agent, name_of_weights_DQN, name_of_plot)
     evaluate_network(aft_agent, name_of_weights_DQN)
 
 stop = timeit.default_timer()
-print('Total run time: ', stop - start)
+print('Total run time: %i min' % ((stop - start)/60))
 
 
 

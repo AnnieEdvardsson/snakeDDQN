@@ -146,9 +146,9 @@ class AGENT(object):
         :return: Keras model
         '''
         x = Input(shape=(self.state_dim,))
-        fc = Dense(120, activation='relu', kernel_initializer='VarianceScaling', input_dim=self.state_dim)(x)
-        fc = Dense(120, activation='relu', kernel_initializer='VarianceScaling')(fc)
-        fc = Dense(60, activation='relu', kernel_initializer='VarianceScaling')(fc)
+        fc = Dense(60, activation='relu', kernel_initializer='VarianceScaling', input_dim=self.state_dim)(x)
+        # fc = Dense(120, activation='relu', kernel_initializer='VarianceScaling')(fc)
+        # fc = Dense(60, activation='relu', kernel_initializer='VarianceScaling')(fc)
         Q_initializer = RandomUniform(minval=-1e-6, maxval=1e-6, seed=None)
         q_value = Dense(self.action_dim, activation='softmax', kernel_initializer=Q_initializer)(fc)
         model = Model(inputs=x, outputs=q_value)
