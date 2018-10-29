@@ -243,10 +243,8 @@ def plot_seaborn(array_counter, array_score, plot_name):
     sns.set(color_codes=True)
     ax = sns.regplot(np.array([array_counter])[0], np.array([array_score])[0], color="b", x_jitter=.1, line_kws={'color':'green'})
     ax.set(xlabel='games', ylabel='score')
-    #plt.savefig(plot_name, dpi=400)
+    plt.savefig(plot_name, dpi=400)
 
-    fig = ax.get_figure()
-    fig.savefig(plot_name, dpi=400)
     plt.show()
 
 
@@ -335,9 +333,6 @@ def evaluate_network(agent, name_weights):
 
         print('Game %i      Score: %i      Epsilon: %.4f    Highest: %i' % (counter_games, game.score, round(eps, 5), record))
 
-        print('Game %i      Score: %i      Epsilon: %.4f' % (counter_games, game.score, round(eps, 5)))
-
-        print('Game %i      Score: %i      Epsilon: %.4f    Highest: %i' % (counter_games,game.score ,round(eps, 5), record))
         score_plot.append(game.score)
         counter_plot.append(counter_games)
 
@@ -561,7 +556,7 @@ else:
     evaluate_network(aft_agent, name_of_weights_DQN)
 
 stop = timeit.default_timer()
-print('Total run time: ', stop - start)
+print('Total run time: %i min' % ((stop - start)/60))
 
 
 
