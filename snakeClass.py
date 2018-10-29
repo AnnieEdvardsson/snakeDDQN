@@ -527,39 +527,3 @@ print('Total run time: %i min' % ((stop - start)/60))
 
 
 
-# ################ CHANGE THESE!!!!! ##############
-DDQN = True
-target = False
-# #################################################
-
-# Start timer
-start = timeit.default_timer()
-if DDQN is True:
-
-    # Name of weights + Initialize DDQN class + run training + evaluate
-    name_of_weights_DDQN = 'weights_DDQN.h5'
-    name_of_plot = 'train_plot_DDQN'
-    pre_agent = DDQNAgent()
-    aft_agent = run(pre_agent, name_of_weights_DDQN, name_of_plot)
-    evaluate_network(aft_agent, name_of_weights_DDQN)
-else:
-    # Name of weights + Initialize DQN target class + run training + evaluatn
-    if target:
-        name_of_weights_DQN = 'weights_DQN_target.h5'
-        name_of_plot = 'train_plot_DQN_target'
-    else:
-        name_of_weights_DQN = 'weights_DQN_not_target.h5'
-        name_of_plot = 'train_plot_DQN_not_target'
-
-    pre_agent = DQNAgent(target)
-    aft_agent = run(pre_agent, name_of_weights_DQN, name_of_plot)
-    evaluate_network(aft_agent, name_of_weights_DQN)
-
-stop = timeit.default_timer()
-print('Total run time: %i min' % ((stop - start)/60))
-
-
-
-
-
-
