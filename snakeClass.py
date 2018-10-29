@@ -261,11 +261,11 @@ def evaluate_network(agent, name_weights):
     average_score = 0
 
     eps = 0
-    number_episodes = 15  # Number of episodes (games) we train on
+    number_episodes = 100  # Number of episodes (games) we train on
 
     # Load the weighs of the model from the computer
     if agent.DDQN is True:
-        agent.offline_model.load_weights(name_weights)
+        agent.online_model.load_weights(name_weights)
     else:
         agent.target_model.load_weights(name_weights)
 
@@ -302,7 +302,7 @@ def evaluate_network(agent, name_weights):
 
             # Choose an action w.r.t. the policy and converts it to one-hot format (eg 2 to [0, 0, 1])
             action = np.random.choice(3, p=policy)
-            action_hot = to_categorical(action, num_classes=3)  # [0] # CHANGE HERE
+            action_hot = to_categorical(action, num_classes=3)#[0] # CHANGE HERE
 
             # Let the player do the chosen action
             player1.do_move(action_hot, player1.x, player1.y, game, food1)
@@ -329,7 +329,7 @@ def evaluate_network(agent, name_weights):
                 pygame.time.wait(speed)
 
         counter_games += 1
-        print('Game %i      Score: %i      Epsilon: %.4f' % (counter_games, game.score, round(eps, 5)))
+        print('Game %i      Score: %i      Epsilon: %.4f    Highest: %i' % (counter_games,game.score ,round(eps, 5), record))
         score_plot.append(game.score)
         counter_plot.append(counter_games)
 
@@ -342,7 +342,7 @@ def evaluate_network(agent, name_weights):
     average_score = round(average_score/number_episodes)
     print('The highest score: %i, the average score: %i' % (record, average_score))
 
-    return agent
+    return agent, counter_plot, score_plot
 
 
 def run(agent, name_weights):
@@ -365,8 +365,8 @@ def run(agent, name_weights):
     eps_end = .01                   # "Final epsilon"
     eps_decay = .0005               # Parameter how slowly it decays
 
-    batch_size = 256                # The size of the batch
-    gamma = 0.95                    # How much the future rewards matter
+    batch_size = 128                # The size of the batch
+    gamma = 0.99                    # How much the future rewards matter
     number_episodes = 2000          # Number of episodes (games) we train on
 
     tau_lim = 5                     # Number of iteration between target updates
@@ -502,24 +502,8 @@ def run(agent, name_weights):
     plot_seaborn(counter_plot, score_plot)
     plt.savefig('train_plot', dpi=400)
 
-    return agent
+    return agent, counter_plot, score_plot
 
-DDQN = True
-
-if DDQN is True:
-
-    # Name of weights + Initialize DDQN class + run training + evaluate
-    name_of_weights_DDQN = 'weights_DDQN.h5'
-    pre_agent = DDQNAgent()
-    aft_agent = run(pre_agent, name_of_weights_DDQN)
-    evaluate_network(aft_agent, name_of_weights_DDQN)
-else:
-
-    # Name of weights + Initialize DQN target class + run training + evaluate
-    name_of_weights_DQN = 'weights_DQN.h5'
-    pre_agent = DQNAgent()
-    aft_agent = run(pre_agent, name_of_weights_DQN)
-    evaluate_network(aft_agent, name_of_weights_DQN)
 
 
 
