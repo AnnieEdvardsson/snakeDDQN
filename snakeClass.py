@@ -439,10 +439,11 @@ def run(agent, name_weights):
 
                     # Perform one update step on the model and 50% chance to switch between online and offline network
                     # Almost the same thing as model.fit in Keras
-                    if tau > tau_lim:
-                        agent.update_tau(s, td_target, a)
-                    else:
-                        agent.update(s, td_target, a)
+                    agent.update(s, td_target, a)
+                    
+                    # Update q-target if agent.targetIt is greater than 10
+                    agent.target_update(tau_lim)
+
                      
 
                 else:
@@ -490,7 +491,7 @@ def run(agent, name_weights):
         
         # agent.replay_new(agent.memory)
         counter_games += 1
-        print('Game %i      Score: %i      Epsilon: %.4f' % (counter_games,game.score ,round(eps, 5)))
+        print('Game %i      Score: %i      Epsilon: %.4f    Highest: %i' % (counter_games,game.score ,round(eps, 5), record))
         score_plot.append(game.score)
         counter_plot.append(counter_games)
 

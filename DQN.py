@@ -262,8 +262,21 @@ class DDQNAgent(AGENT):
         '''
         actions_one_hot = to_categorical(np.squeeze(actions), self.action_dim)
         self._update([states, np.squeeze(td_target), actions_one_hot])
-        if np.random.uniform() > .5:
+                
+    def target_update(self, tau_lim):
+        """
+        Updates the Q-target w.r.t Q
+        :param Q: The updated Q value
+        """
+
+        self.targetIt += 1
+
+        if self.targetIt > tau_lim:
+            self.targetIt = 0
+
+            self.targetIt = 0
             self.__switch_weights()
+
 
     def __switch_weights(self):
         '''
