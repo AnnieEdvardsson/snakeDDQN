@@ -272,7 +272,7 @@ def evaluate_network(agent, name_weights):
     # Load the weighs of the model from the computer
     agent.online_model.load_weights(name_weights)
     if agent.DDQN is True:
-        agent.offline_model.load_weights(name_weights)
+        agent.online_model.load_weights(name_weights)
     else:
         agent.target_model.load_weights(name_weights)
 
@@ -305,7 +305,7 @@ def evaluate_network(agent, name_weights):
 
             # Choose an action w.r.t. the policy and converts it to one-hot format (eg 2 to [0, 0, 1])
             action = np.random.choice(3, p=policy)
-            action_hot = to_categorical(action, num_classes=3)  # [0] # CHANGE HERE
+            action_hot = to_categorical(action, num_classes=3)#[0] # CHANGE HERE
 
             # Let the player do the chosen action
             player1.do_move(action_hot, player1.x, player1.y, game, food1)
@@ -332,7 +332,12 @@ def evaluate_network(agent, name_weights):
                 pygame.time.wait(speed)
 
         counter_games += 1
+
         print('Game %i      Score: %i      Epsilon: %.4f    Highest: %i' % (counter_games, game.score, round(eps, 5), record))
+
+        print('Game %i      Score: %i      Epsilon: %.4f' % (counter_games, game.score, round(eps, 5)))
+
+        print('Game %i      Score: %i      Epsilon: %.4f    Highest: %i' % (counter_games,game.score ,round(eps, 5), record))
         score_plot.append(game.score)
         counter_plot.append(counter_games)
 
@@ -341,7 +346,7 @@ def evaluate_network(agent, name_weights):
     average_score = round(average_score/number_episodes)
     print('The highest score: %i, the average score: %i' % (record, average_score))
 
-    return agent
+    return agent, counter_plot, score_plot
 
 
 def run(agent, name_weights, name_plot):
@@ -492,7 +497,7 @@ def run(agent, name_weights, name_plot):
     # Plot the score to the number of game
     plot_seaborn(counter_plot, score_plot, name_plot)
 
-    return agent
+    return agent, counter_plot, score_plot
 
 # ################ CHANGE THESE!!!!! ##############
 DDQN = False
@@ -524,6 +529,39 @@ else:
 
 stop = timeit.default_timer()
 print('Total run time: %i min' % ((stop - start)/60))
+
+
+
+# ################ CHANGE THESE!!!!! ##############
+DDQN = True
+target = False
+# #################################################
+
+# Start timer
+start = timeit.default_timer()
+if DDQN is True:
+
+    # Name of weights + Initialize DDQN class + run training + evaluate
+    name_of_weights_DDQN = 'weights_DDQN.h5'
+    name_of_plot = 'train_plot_DDQN'
+    pre_agent = DDQNAgent()
+    aft_agent = run(pre_agent, name_of_weights_DDQN, name_of_plot)
+    evaluate_network(aft_agent, name_of_weights_DDQN)
+else:
+    # Name of weights + Initialize DQN target class + run training + evaluatn
+    if target:
+        name_of_weights_DQN = 'weights_DQN_target.h5'
+        name_of_plot = 'train_plot_DQN_target'
+    else:
+        name_of_weights_DQN = 'weights_DQN_not_target.h5'
+        name_of_plot = 'train_plot_DQN_not_target'
+
+    pre_agent = DQNAgent(target)
+    aft_agent = run(pre_agent, name_of_weights_DQN, name_of_plot)
+    evaluate_network(aft_agent, name_of_weights_DQN)
+
+stop = timeit.default_timer()
+print('Total run time: ', stop - start)
 
 
 
