@@ -277,7 +277,6 @@ class DDQNAgent(AGENT):
             self.targetIt = 0
             self.__switch_weights()
 
-
     def __switch_weights(self):
         '''
         Switches between online and offline networks
@@ -312,10 +311,11 @@ class DQNAgent(AGENT):
         A DQN, a subclass of AGENT
     """
 
-    def __init__(self):
+    def __init__(self, target):
         AGENT.__init__(self)  # Run the init function in the Base class AGENT
         self.DDQN = False
         self.target_model = self.build_model()
+        self.target = target
 
     def update(self, states, td_target, actions):
         '''
@@ -334,7 +334,10 @@ class DQNAgent(AGENT):
         :param state:
         :return:
         '''
-        return self.target_model.predict(state)
+        if self.target is True:
+            return self.target_model.predict(state)
+        else:
+            return self.online_model.predict(state)
 
     @staticmethod
     def calculate_td_targets(Q,  r_batch, t_batch, gamma=.99):
@@ -356,17 +359,19 @@ class DQNAgent(AGENT):
 
     def target_update(self, tau_lim):
         """
-        Updates the Q-target w.r.t Q
-        :param Q: The updated Q value
+        Updates the weights of the target network if self.targetIt is greater than tau_lim
+        :param tau_lim:
+        :return: None
         """
+        if self.target is True:
 
-        self.targetIt += 1
+            self.targetIt += 1
 
-        if self.targetIt > tau_lim:
-            self.targetIt = 0
+            if self.targetIt > tau_lim:
+                self.targetIt = 0
 
-            self.online_model.save_weights("model_online_weights.h5")
-            self.target_model.load_weights("model_online_weights.h5")
+                self.online_model.save_weights("model_online_weights.h5")
+                self.target_model.load_weights("model_online_weights.h5")
 
 
 

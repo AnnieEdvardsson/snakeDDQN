@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from collections import namedtuple
+import timeit
 
 
 # Set options to activate or deactivate the game view, and its speed
@@ -231,17 +232,19 @@ def initialize_game(player, game, food, agent, replay_buffer):
     replay_buffer.add(Transition(s=state_init1, a=np.argmax(action), r=reward1, next_s=state_init2, t=game.crash))
 
 
-def plot_seaborn(array_counter, array_score):
+def plot_seaborn(array_counter, array_score, plot_name):
     """
     Plot a graph over all played games
     :param array_counter:   A vector with increasing numbers [1, 2, 3 ... N]
     :param array_score:     The scores for all played games
+    :param plot_name:       Name of plot
     :return:                None
     """
     sns.set(color_codes=True)
     ax = sns.regplot(np.array([array_counter])[0], np.array([array_score])[0], color="b", x_jitter=.1, line_kws={'color':'green'})
     ax.set(xlabel='games', ylabel='score')
     plt.show()
+    plt.savefig(plot_name, dpi=400)
 
 
 def evaluate_network(agent, name_weights):
@@ -280,9 +283,6 @@ def evaluate_network(agent, name_weights):
         food1 = game.food
         state = agent.get_state(game, player1, food1)
 
-        # Reset variables
-        q_buffer = []  # A vector with all q_values
-
         # Perform first move
         initialize_game(player1, game, food1, agent, replay_buffer)
 
@@ -291,11 +291,10 @@ def evaluate_network(agent, name_weights):
             display(player1, food1, game, record)
 
         # While the snake as not died
-        while not (game.crash or steps > 934):
+        while not (game.crash or steps > 950):
             steps += 1
             # Get the q-values w.r.t. the states
             q_values = agent.get_q_values(state.reshape((1, 12)))
-            q_buffer.append(q_values)
 
             # Evaluate new policy w.r.t q-values and epsilon (epsilon-greedy policy)
             policy = agent.eps_greedy_policy(q_values[0], eps)
@@ -334,10 +333,6 @@ def evaluate_network(agent, name_weights):
         counter_plot.append(counter_games)
 
         average_score += game.score
-
-    # Plot the score to the number of game
-    plot_seaborn(counter_plot, score_plot)
-    plt.savefig('eval_plot', dpi=400)
 
     average_score = round(average_score/number_episodes)
     print('The highest score: %i, the average score: %i' % (record, average_score))
@@ -380,9 +375,6 @@ def run(agent, name_weights):
         food1 = game.food
         state = agent.get_state(game, player1, food1)
 
-        # Reset variables
-        q_buffer = []               # A vector with all q_values
-
         # Perform first move
         initialize_game(player1, game, food1, agent, replay_buffer)
 
@@ -394,7 +386,6 @@ def run(agent, name_weights):
         while not game.crash:
             # Get the q-values w.r.t. the states
             q_values = agent.get_q_values(state.reshape((1, 12)))
-            q_buffer.append(q_values)
 
             # Evaluate new policy w.r.t q-values and epsilon (epsilon-greedy policy)
             policy = agent.eps_greedy_policy(q_values[0], eps)
@@ -444,15 +435,11 @@ def run(agent, name_weights):
                     # Update q-target if agent.targetIt is greater than 10
                     agent.target_update(tau_lim)
 
-                     
-
                 else:
 
                     # Get q_values for network
                     q_values = agent.get_q_values(np.squeeze(s_))
 
-                    #print(q_values.shape)
-                    #print(agent.Q_target.shape)
                     # Calculate the td-targets
                     td_target = agent.calculate_td_targets(q_values, r, t, gamma) #agent.Q_target
 
@@ -499,13 +486,9 @@ def run(agent, name_weights):
     agent.online_model.save_weights(name_weights)
 
     # Plot the score to the number of game
-    plot_seaborn(counter_plot, score_plot)
-    plt.savefig('train_plot', dpi=400)
+    plot_seaborn(counter_plot, score_plot, name_of_plot)
 
     return agent, counter_plot, score_plot
-
-
-
 
 
 
