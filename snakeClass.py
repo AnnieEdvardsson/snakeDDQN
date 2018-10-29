@@ -495,8 +495,8 @@ def run(agent, name_weights, name_plot):
     return agent, counter_plot, score_plot
 
 # ################ CHANGE THESE!!!!! ##############
-DDQN = False
-target = False
+DDQN = False                # Do we run DDQN, else we run DQN
+target = False              # Do run target DQN or not
 # #################################################
 
 # Start timer
